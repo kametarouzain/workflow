@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>承認ワークフロー管理</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>承認ワークフロー管理</h1>
+            <p>承認者とワークフローを設定し、承認プロセスをカスタマイズできます</p>
+        </div>
+
+        <!-- トリガー設定セクション -->
+        <div class="workflow-section">
+            <div class="section-header">
+                <h2 class="section-title">起点承認者の設定</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-secondary" onclick="showPatternModal()">パターン選択</button>
+                    <button class="btn btn-primary" onclick="showSavePatternModal()">パターン保存</button>
+                </div>
+            </div>
+            <div class="trigger-setup">
+                <div class="form-group">
+                    <label class="form-label">起点となる承認者を選択</label>
+                    <select class="form-select" id="triggerApprover" onchange="onTriggerChange()">
+                        <option value="">選択してください</option>
+                        <option value="manager_a" selected>課長A (田中 太郎)</option>
+                        <option value="manager_d">課長D (佐藤 花子)</option>
+                        <option value="director_x">部長X (山田 次郎)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">このワークフローを適用する対象</label>
+                    <select class="form-select" id="workflowTarget" onchange="updatePreview()">
+                        <option value="">適用対象を選択してください</option>
+                        <option value="expense">経費申請</option>
+                        <option value="purchase">購買申請</option>
+                        <option value="contract">契約承認</option>
+                        <option value="leave">休暇申請</option>
+                        <option value="project">プロジェクト承認</option>
+                        <option value="budget">予算申請</option>
+                    </select>
+                </div>
+                <div id="currentPattern" style="margin-top: 12px; padding: 8px 12px; background: #e8f5e8; border-radius: 4px; font-size: 14px; display: none;">
+                    現在のパターン: <span id="currentPatternName"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ワークフロー構築セクション -->
+        <div class="workflow-section">
+            <div class="section-header">
+                <h2 class="section-title">承認ワークフロー設定</h2>
+                <button class="btn btn-secondary" onclick="addParallelStep()">並列承認追加</button>
+            </div>
+            <div class="workflow-builder">
+                <!-- 利用可能な承認者リスト -->
+                <div class="form-group">
+                    <label class="form-label">利用可能な承認者（ドラッグまたはクリックして追加）</label>
+
+                    <!-- 部署フィルター -->
+                    <div style="margin-bottom: 16px;">
+                        <select class="form-select" id="departmentFilter" onchange="filterApproversByDepartment()" style="width: 200px;">
+                            <option value="">全部署</option>
+                            <option value="営業部">営業部</option>
+                            <option value="開発部">開発部</option>
+                            <option value="人事部">人事部</option>
+                            <option value="経理部">経理部</option>
+                            <option value="法務部">法務部</option>
+                        </select>
+                        <span style="margin-left: 12px; color: #7f8c8d; font-size: 14px;" id="approverCount">承認者数: 9名</span>
+                    </div>
+
+                    <div class="approver-list" id="approverList">
+                        <!-- 動的に生成される -->
+                    </div>
+                </div>
+
+                <!-- ワークフローエリア -->
+                <div class="form-group">
+                    <label class="form-label">承認ワークフロー（順序を調整可能）</label>
+                    <div class="workflow-area" ondrop="drop(event)" ondragover="allowDrop(event)">
+                        <div class="workflow-steps" id="workflowSteps">
+                            <!-- Step 1 -->
+                            <div class="workflow-step" data-step="1">
+                                <div class="step-info">
+                                    <div class="step-number">1</div>
+                                    <div class="step-details">
+                                        <div class="step-name">課長B (鈴木 一郎)</div>
+                                        <div class="step-role">必須承認</div>
+                                    </div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="toggleRequired(1)">必須切替</button>
+                                    <button class="btn btn-small btn-danger" onclick="removeStep(1)">削除</button>
+                                </div>
+                            </div>
+
+                            <div class="arrow">↓</div>
+
+                            <!-- Step 2 -->
+                            <div class="workflow-step" data-step="2">
+                                <div class="step-info">
+                                    <div class="step-number">2</div>
+                                    <div class="step-details">
+                                        <div class="step-name">課長C (高橋 美咲)</div>
+                                        <div class="step-role">必須承認</div>
+                                    </div>
+                                </div>
+                                <div class="step-actions">
+                                    <button class="btn btn-small btn-secondary" onclick="toggleRequired(2)">必須切替</button>
+                                    <button class="btn btn-small btn-danger" onclick="removeStep(2)">削除</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- プレビューセクション -->
+                <div class="preview-section">
+                    <div class="preview-title">承認フロープレビュー</div>
+                    <div id="targetInfo" style="margin-bottom: 16px; padding: 8px 12px; background: #f39c12; color: white; border-radius: 4px; font-size: 14px; display: none;">
+                        適用対象: <span id="targetDisplay"></span>
+                    </div>
+                    <div class="preview-flow" id="previewFlow">
+                        <div class="preview-step">起点承認者を選択してください</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-secondary">キャンセル</button>
+                <button class="btn btn-success">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- パターン選択モーダル -->
+    <div id="patternModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ワークフローパターン選択</h3>
+                <button class="btn-close" onclick="closePatternModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="pattern-list" id="patternList">
+                    <!-- 動的に生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- パターン保存モーダル -->
+    <div id="savePatternModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ワークフローパターン保存</h3>
+                <button class="btn-close" onclick="closeSavePatternModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">パターン名</label>
+                    <input type="text" class="form-select" id="patternName" placeholder="例: 営業部標準フロー" style="width: 100%;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">説明（任意）</label>
+                    <textarea class="form-select" id="patternDescription" placeholder="パターンの説明を入力" style="width: 100%; height: 80px; resize: vertical;"></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeSavePatternModal()">キャンセル</button>
+                    <button class="btn btn-success" onclick="saveCurrentPattern()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
